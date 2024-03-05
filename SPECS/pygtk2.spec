@@ -11,7 +11,7 @@
 
 Name: pygtk2
 Version: 2.24.0
-Release: 24%{?dist}
+Release: 25%{?dist}
 License: LGPLv2+
 Group: Development/Languages
 Summary: Python bindings for GTK+
@@ -43,7 +43,15 @@ BuildRequires: glib2-devel >= %{glib2_version}
 BuildRequires: gtk2-devel >= %{gtk2_version}
 BuildRequires: libtool
 BuildRequires: libxslt
+# python2-numpy is only needed if you use a small subset of pygtk2, and has
+# to be pulled in explicitly - there is no longer a hard Requires. Since we're
+# not including python2-numpy in the GIMP Flatpak, which is the only Flatpak where
+# we're including pygtk, there is no reason to build the support at all for
+# a Flatpak build. (This avoids having to build python2-numpy and a pile of
+# dependencies in the GIMP Flatpak.)
+%if !0%{?flatpak}
 BuildRequires: python2-numpy
+%endif
 BuildRequires: pango-devel >= %{pango_version}
 BuildRequires: python2-cairo-devel >= %{pycairo_version}
 BuildRequires: pygobject2-devel >= %{pygobject2_version}
@@ -88,7 +96,7 @@ This package contains documentation files for %{name}.
 %patch0 -p1 -b .Fix-leaks-of-Pango-objects
 
 # Fix shebangs to system Python2.x
-for file in $(%{_bindir}/find . -name '*.py' -type f)
+for file in $(find . -name '*.py' -type f)
 do
 	%{__sed} -i.orig						\
 	-e 's~#!/usr/bin/python(2\?)~#!%{__python2}~'\
@@ -99,7 +107,11 @@ do
 done
 
 %build
+%if !0%{?flatpak}
+%configure --enable-thread --disable-numpy --without-glade
+%else
 %configure --enable-thread --enable-numpy --without-glade
+%endif
 %{make_build}
 
 %install
@@ -107,7 +119,7 @@ done
 find %{buildroot} -name '*.la' -or -name '*.a' | xargs rm -f
 
 # Fix python shebangs
-sed -i 's|^#! /usr/bin/python(2\?)|#!%{__python2}|' %{buildroot}/usr/bin/pygtk-demo
+sed -i 's|^#! /usr/bin/python(2\?)|#!%{__python2}|' %{buildroot}%{_bindir}/pygtk-demo
 
 %files
 %doc AUTHORS NEWS README MAPPING
@@ -133,6 +145,10 @@ sed -i 's|^#! /usr/bin/python(2\?)|#!%{__python2}|' %{buildroot}/usr/bin/pygtk-d
 %{_datadir}/gtk-doc/html/pygtk/
 
 %changelog
+* Mon Jan 11 2021 Jan Beran <jaberan@redhat.com> 2.24.0-25
+- Fix shebang mangling for _prefix=app (#1907579)
+- disable numpy for flatpak (#1907579)
+
 * Wed Sep 12 2018 Josef Ridky <jridky@redhat.com> - 2.24.0-24
 - remove libglade dependency and sub-package (#1622134)
 
